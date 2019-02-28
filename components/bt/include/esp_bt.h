@@ -43,7 +43,7 @@ typedef struct {
 } esp_bt_controller_config_t;
 
 #ifdef CONFIG_BT_ENABLED
-/* While scanning, if the free memory value in controller is less than SCAN_SEND_ADV_RESERVED_SIZE, 
+/* While scanning, if the free memory value in controller is less than SCAN_SEND_ADV_RESERVED_SIZE,
 the adv packet will be discarded until the memory is restored. */
 #define SCAN_SEND_ADV_RESERVED_SIZE        1000
 /* enable controller log debug when adv lost */
@@ -285,8 +285,12 @@ bool esp_vhci_host_check_send_available(void);
 
 /** @brief esp_vhci_host_send_packet
  * host send packet to controller
+ *
+ * Should not call this function from within a critical section
+ * or when the scheduler is suspended.
+ *
  * @param data the packet point
- *,@param len the packet length
+ * @param len the packet length
  */
 void esp_vhci_host_send_packet(uint8_t *data, uint16_t len);
 
@@ -334,7 +338,6 @@ esp_err_t esp_bt_controller_mem_release(esp_bt_mode_t mode);
  *
  * For ORIG mode:
  * Bluetooth modem sleep is enabled in controller start up by default if CONFIG_BTDM_CONTROLLER_MODEM_SLEEP is set and "ORIG mode" is selected. In ORIG modem sleep mode, bluetooth controller will switch off some components and pause to work every now and then, if there is no event to process; and wakeup according to the scheduled interval and resume the work. It can also wakeup earlier upon external request using function "esp_bt_controller_wakeup_request".
- * Note that currently there is problem in the combination use of bluetooth modem sleep and Dynamic Frequency Scaling(DFS). So do not enable DFS if bluetooth modem sleep is in use.
  *
  * @return
  *                  - ESP_OK : success

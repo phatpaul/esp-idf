@@ -2,8 +2,7 @@ stages:
   - build
   - assign_test
   - host_test
-  - unit_test
-  - integration_test
+  - target_test
   - deploy
   - post_check
 
@@ -109,12 +108,15 @@ build_template_app:
       - $BOT_LABEL_BUILD
       - $BOT_LABEL_REGULAR_TEST
   script:
-    - git clone https://github.com/espressif/esp-idf-template.git
+    # Set the variable for 'esp-idf-template' testing
+    - ESP_IDF_TEMPLATE_GIT=${ESP_IDF_TEMPLATE_GIT:-"https://github.com/espressif/esp-idf-template.git"}
+    - git clone ${ESP_IDF_TEMPLATE_GIT}
     - cd esp-idf-template
     # Try to use the same branch name for esp-idf-template that we're
     # using on esp-idf. If it doesn't exist then just stick to the default
     # branch
     - python $CHECKOUT_REF_SCRIPT esp-idf-template
+    - make defconfig
     # Test debug build (default)
     - make all V=1
     # Now test release build
@@ -654,7 +656,7 @@ assign_test:
     - python CIAssignTestCases.py -t $IDF_PATH/components/idf_test/integration_test -c $IDF_PATH/.gitlab-ci.yml -b $IDF_PATH/SSC/ssc_bin
 
 .example_test_template: &example_test_template
-  stage: integration_test
+  stage: target_test
   when: on_success
   only:
     refs:
@@ -688,7 +690,9 @@ assign_test:
     when: always
     paths:
       - $LOG_PATH
-    expire_in: 1 mos
+    expire_in: 1 week
+    reports:
+        junit: $LOG_PATH/*/XUNIT_RESULT.xml
   variables:
     TEST_FW_PATH: "$CI_PROJECT_DIR/tools/tiny-test-fw"
     TEST_CASE_PATH: "$CI_PROJECT_DIR/examples"
@@ -708,7 +712,7 @@ assign_test:
 
 .unit_test_template: &unit_test_template
   <<: *example_test_template
-  stage: unit_test
+  stage: target_test
   dependencies:
     - assign_test
     - build_esp_idf_tests
@@ -730,7 +734,7 @@ assign_test:
     ENV_FILE: "$CI_PROJECT_DIR/ci-test-runner-configs/$CI_RUNNER_DESCRIPTION/EnvConfig.yml"
 
 .test_template: &test_template
-  stage: integration_test
+  stage: target_test
   when: on_success
   only:
     refs:
@@ -806,6 +810,16 @@ example_test_001_01:
 
 example_test_002_01:
   <<: *example_test_template
+  tags:
+    - ESP32
+    - Example_ShieldBox_Basic
+
+example_test_006_01:
+  <<: *example_test_template
+  image: $CI_DOCKER_REGISTRY/ubuntu-test-env$BOT_DOCKER_IMAGE_TAG
+  only:
+    variables:
+      - $BOT_LABEL_IPERF_STRESS_TEST
   tags:
     - ESP32
     - Example_ShieldBox
@@ -996,6 +1010,18 @@ UT_001_31:
     - ESP32_IDF
     - UT_T1_1
 
+UT_001_32:
+  <<: *unit_test_template
+  tags:
+    - ESP32_IDF
+    - UT_T1_1
+
+UT_001_32:
+  <<: *unit_test_template
+  tags:
+    - ESP32_IDF
+    - UT_T1_1
+
 UT_002_01:
   <<: *unit_test_template
   tags:
@@ -1102,6 +1128,13 @@ UT_004_10:
     - UT_T1_1
     - psram
 
+UT_004_11:
+  <<: *unit_test_template
+  tags:
+    - ESP32_IDF
+    - UT_T1_1
+    - psram
+
 UT_005_01:
   <<: *unit_test_template
   tags:
@@ -1191,7 +1224,51 @@ UT_010_04:
     - UT_T1_RMT
     - psram
 
+UT_017_01:
+  <<: *unit_test_template
+  tags:
+    - ESP32_IDF
+    - UT_T2_1
+
+UT_017_02:
+  <<: *unit_test_template
+  tags:
+    - ESP32_IDF
+    - UT_T2_1
+
+UT_017_03:
+  <<: *unit_test_template
+  tags:
+    - ESP32_IDF
+    - UT_T2_1
+
+UT_017_04:
+  <<: *unit_test_template
+  tags:
+    - ESP32_IDF
+    - UT_T2_1
+    - psram
+
+UT_017_05:
+  <<: *unit_test_template
+  tags:
+    - ESP32_IDF
+    - UT_T2_1
+    - 8Mpsram
+
 UT_601_01:
+  <<: *unit_test_template
+  tags:
+    - ESP32_IDF
+    - UT_T1_1
+
+UT_601_02:
+  <<: *unit_test_template
+  tags:
+    - ESP32_IDF
+    - UT_T1_1
+
+UT_601_03:
   <<: *unit_test_template
   tags:
     - ESP32_IDF
@@ -1347,6 +1424,18 @@ IT_006_05:
     - ESP32_IDF
     - SSC_T1_6
 
+IT_006_06:
+  <<: *test_template
+  tags:
+    - ESP32_IDF
+    - SSC_T1_6
+
+IT_006_07:
+  <<: *test_template
+  tags:
+    - ESP32_IDF
+    - SSC_T1_6
+
 IT_007_01:
   <<: *test_template
   tags:
@@ -1354,6 +1443,12 @@ IT_007_01:
     - SSC_T1_7
 
 IT_007_02:
+  <<: *test_template
+  tags:
+    - ESP32_IDF
+    - SSC_T1_7
+
+IT_007_03:
   <<: *test_template
   tags:
     - ESP32_IDF
@@ -1384,6 +1479,12 @@ IT_011_01:
     - SSC_T50_1
 
 IT_012_01:
+  <<: *test_template
+  tags:
+    - ESP32_IDF
+    - SSC_T1_9
+
+IT_012_02:
   <<: *test_template
   tags:
     - ESP32_IDF

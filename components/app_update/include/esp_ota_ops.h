@@ -20,6 +20,8 @@
 #include <stddef.h>
 #include "esp_err.h"
 #include "esp_partition.h"
+#include "esp_image_format.h"
+#include "esp_flash_partitions.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -32,6 +34,10 @@ extern "C"
 #define ESP_ERR_OTA_PARTITION_CONFLICT           (ESP_ERR_OTA_BASE + 0x01)  /*!< Error if request was to write or erase the current running partition */
 #define ESP_ERR_OTA_SELECT_INFO_INVALID          (ESP_ERR_OTA_BASE + 0x02)  /*!< Error if OTA data partition contains invalid content */
 #define ESP_ERR_OTA_VALIDATE_FAILED              (ESP_ERR_OTA_BASE + 0x03)  /*!< Error if OTA app image is invalid */
+#define ESP_ERR_OTA_SMALL_SEC_VER                (ESP_ERR_OTA_BASE + 0x04)  /*!< Error if the firmware has a secure version less than the running firmware. */
+#define ESP_ERR_OTA_ROLLBACK_FAILED              (ESP_ERR_OTA_BASE + 0x05)  /*!< Error if flash does not have valid firmware in passive partition and hence rollback is not possible */
+#define ESP_ERR_OTA_ROLLBACK_INVALID_STATE       (ESP_ERR_OTA_BASE + 0x06)  /*!< Error if current active firmware is still marked in pending validation state (ESP_OTA_IMG_PENDING_VERIFY), essentially first boot of firmware image post upgrade and hence firmware upgrade is not possible */
+
 
 /**
  * @brief Opaque handle for an application OTA update
@@ -40,6 +46,24 @@ extern "C"
  * calls to esp_ota_write() and esp_ota_end().
  */
 typedef uint32_t esp_ota_handle_t;
+
+/**
+ * @brief   Return esp_app_desc structure. This structure includes app version.
+ * 
+ * Return description for running app.
+ * @return Pointer to esp_app_desc structure.
+ */
+const esp_app_desc_t *esp_ota_get_app_description(void);
+
+/**
+ * @brief   Fill the provided buffer with SHA256 of the ELF file, formatted as hexadecimal, null-terminated.
+ * If the buffer size is not sufficient to fit the entire SHA256 in hex plus a null terminator,
+ * the largest possible number of bytes will be written followed by a null.
+ * @param dst   Destination buffer
+ * @param size  Size of the buffer
+ * @return      Number of bytes written to dst (including null terminator)
+ */
+int esp_ota_get_app_elf_sha256(char* dst, size_t size);
 
 /**
  * @brief   Commence an OTA update writing to the specified partition.
@@ -51,6 +75,10 @@ typedef uint32_t esp_ota_handle_t;
  *
  * On success, this function allocates memory that remains in use
  * until esp_ota_end() is called with the returned handle.
+ *
+ * Note: If the rollback option is enabled and the running application has the ESP_OTA_IMG_PENDING_VERIFY state then
+ * it will lead to the ESP_ERR_OTA_ROLLBACK_INVALID_STATE error. Confirm the running app before to run download a new app,
+ * use esp_ota_mark_app_valid_cancel_rollback() function for it (this should be done as early as possible when you first download a new application).
  *
  * @param partition Pointer to info for partition which will receive the OTA update. Required.
  * @param image_size Size of new OTA app image. Partition will be erased in order to receive this size of image. If 0 or OTA_SIZE_UNKNOWN, the entire partition is erased.
@@ -65,6 +93,7 @@ typedef uint32_t esp_ota_handle_t;
  *    - ESP_ERR_OTA_SELECT_INFO_INVALID: The OTA data partition contains invalid data.
  *    - ESP_ERR_INVALID_SIZE: Partition doesn't fit in configured flash size.
  *    - ESP_ERR_FLASH_OP_TIMEOUT or ESP_ERR_FLASH_OP_FAIL: Flash write failed.
+ *    - ESP_ERR_OTA_ROLLBACK_INVALID_STATE: If the running app has not confirmed state. Before performing an update, the application must be valid.
  */
 esp_err_t esp_ota_begin(const esp_partition_t* partition, size_t image_size, esp_ota_handle_t* out_handle);
 
@@ -132,7 +161,7 @@ esp_err_t esp_ota_set_boot_partition(const esp_partition_t* partition);
  * If the OTA data partition is not present or not valid then the result is the first app partition found in the
  * partition table. In priority order, this means: the factory app, the first OTA app slot, or the test app partition.
  *
- * Note that there is no guarantee the returned partition is a valid app. Use esp_image_load(ESP_IMAGE_VERIFY, ...) to verify if the
+ * Note that there is no guarantee the returned partition is a valid app. Use esp_image_verify(ESP_IMAGE_VERIFY, ...) to verify if the
  * returned partition contains a bootable image.
  *
  * @return Pointer to info for partition structure, or NULL if partition table is invalid or a flash read operation failed. Any returned pointer is valid for the lifetime of the application.

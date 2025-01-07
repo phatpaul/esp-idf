@@ -566,6 +566,7 @@ static inline void i2c_ll_write_txfifo(i2c_dev_t *hw, uint8_t *ptr, uint8_t len)
     }
 }
 
+#include "soc/dport_access.h"
 /**
  * @brief  Read the I2C hardware rxFIFO
  *
@@ -579,7 +580,10 @@ __attribute__((always_inline))
 static inline void i2c_ll_read_rxfifo(i2c_dev_t *hw, uint8_t *ptr, uint8_t len)
 {
     for(int i = 0; i < len; i++) {
-        ptr[i] = HAL_FORCE_READ_U32_REG_FIELD(hw->fifo_data, data);
+        //ptr[i] = HAL_FORCE_READ_U32_REG_FIELD(hw->fifo_data, data);
+        // Known issue that hardware read fifo will cause data lose, (fifo pointer jump over a random address)
+        // use `DPORT_REG_READ` can avoid this issue.
+        ptr[i] = DPORT_REG_READ((uint32_t)&hw->fifo_data);
     }
 }
 

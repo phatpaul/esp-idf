@@ -518,6 +518,9 @@ static void IRAM_ATTR i2c_isr_handler_default(void *arg)
             }
         } else {
             // Do nothing if there is no proper event.
+            // HACK FOR IDF where it gets locked into i2c interrupt
+            ESP_EARLY_LOGW(I2C_TAG, "Clearing unhandled interrupt");
+            i2c_hal_clr_intsts_mask(&(i2c_context[i2c_num].hal), I2C_LL_INTR_MASK);
             return;
         }
         i2c_cmd_evt_t evt = {
